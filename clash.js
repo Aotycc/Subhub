@@ -125,7 +125,7 @@ export async function handleClashRequest(request, env) {
         if (displayMode) {
             return new Response(config, {
                 headers: {
-                    'Content-Type': 'text/plain', // 纯文本显示
+                    'Content-Type': 'text/plain; charset=utf-8',
                     'Access-Control-Allow-Origin': '*'
                 }
             });
@@ -303,7 +303,7 @@ async function handleExistingClashConfig(content, templateUrl, env, displayMode)
         if (displayMode) {
             return new Response(configYaml, {
                 headers: {
-                    'Content-Type': 'text/plain', // 纯文本显示
+                    'Content-Type': 'text/plain; charset=utf-8',
                     'Access-Control-Allow-Origin': '*'
                 }
             });
