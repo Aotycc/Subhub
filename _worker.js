@@ -20,6 +20,7 @@ import {
     handleDeleteTemplate,
     generateTemplateManagerHTML
 } from './tempmanager.js';
+
 /**
  * 处理请求
  * @param {Request} request
@@ -81,7 +82,7 @@ async function handleRequest(request, env) {
             'Access-Control-Allow-Headers': 'Content-Type'
         };
         
-        // ���理 OPTIONS 请求
+        // 处理 OPTIONS 请求
         if (request.method === 'OPTIONS') {
             return new Response(null, { headers: corsHeaders });
         }
@@ -153,4 +154,4 @@ export default {
             });
         }
     }
-}; 
+};
