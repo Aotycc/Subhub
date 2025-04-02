@@ -50,18 +50,6 @@ function decodeNodeName(encodedName, fallback = 'Unnamed') {
 
 export default class Parser {
     /**
-     * 检测是否为完整的Clash配置
-     * @param {string} content - 配置内容
-     * @returns {boolean} - 是否为完整Clash配置
-     */
-    static isCompleteClashConfig(content) {
-        // 检查是否包含完整的Clash配置结构
-        return content.includes('proxies:') && 
-               content.includes('proxy-groups:') && 
-               (content.includes('rules:') || content.includes('rule-providers:'));
-    }
-
-    /**
      * 解析订阅内容
      * @param {string} url - 订阅链接或短链ID
      * @param {Env} [env] - KV 环境变量
@@ -111,6 +99,19 @@ export default class Parser {
     }
 
     /**
+     * 检查内容是否为Clash YAML格式
+     * @param {string} content 
+     * @returns {boolean}
+     */
+    static isClashYaml(content) {
+        // 检查是否包含Clash配置的关键字段
+        return content.includes('proxies:') && 
+               (content.includes('rules:') || 
+                content.includes('rule-providers:') ||
+                content.includes('proxy-groups:'));
+    }
+
+    /**
      * 解析订阅内容
      * @param {string} content 
      * @returns {Promise<Array>} 节点列表
@@ -119,14 +120,25 @@ export default class Parser {
         try {
             if (!content) return [];
 
-            // 检查是否为完整的Clash配置
-            if (this.isCompleteClashConfig(content)) {
-                // 如果是完整的Clash配置，返回一个特殊标记
-                return [{ type: 'clash_config', content: content }];
+            // 检查是否是Clash YAML格式
+            if (this.isClashYaml(content)) {
+                // 返回一个特殊标记，表示这是Clash格式的配置
+                return [{
+                    type: 'clash-config',
+                    content: content
+                }];
             }
 
             // 尝试 Base64 解码
             let decodedContent = this.tryBase64Decode(content);
+            
+            // 再次检查解码后的内容是否是Clash YAML
+            if (this.isClashYaml(decodedContent)) {
+                return [{
+                    type: 'clash-config',
+                    content: decodedContent
+                }];
+            }
             
             // 分割成行
             const lines = decodedContent.split(/[\n\s]+/).filter(line => line.trim());
