@@ -290,6 +290,31 @@ export function generateHtml() {
             }, 2000);
         };
 
+        // 检查订阅类型函数
+        async function checkSubscriptionType(url) {
+            try {
+                // 如果不是URL，直接返回空对象
+                if (!url.startsWith('http')) return {};
+                
+                const response = await fetch(url);
+                if (!response.ok) return {};
+                
+                const content = await response.text();
+                const isClashFormat = content.includes('proxies:');
+                const isCompleteClash = isClashFormat && 
+                                        content.includes('proxy-groups:') && 
+                                        (content.includes('rules:') || content.includes('rule-providers:'));
+                
+                return {
+                    isClashFormat,
+                    isCompleteClash
+                };
+            } catch (error) {
+                console.error('检查订阅类型失败:', error);
+                return {};
+            }
+        }
+
         class SubscriptionGenerator {
             constructor() {
                 this.initEventListeners();
@@ -404,7 +429,7 @@ export function generateHtml() {
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                                         </svg>
                                                     </button>
-                                                    <button onclick="copyToClipboard('\${clashDisplayUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制显示链接">
+                                                    <button onclick="copyToClipboard('\${clashDisplayUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制查看链接">
                                                         <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -415,11 +440,11 @@ export function generateHtml() {
                                             <div class="link-url bg-gray-900 p-3 rounded text-white font-mono break-all">
                                                 \${clashUrl}
                                             </div>
-                                            <div class="mt-2 flex space-x-2">
-                                                <button onclick="window.open('\${clashUrl}', '_blank')" class="w-1/2 p-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                                            <div class="mt-2 grid grid-cols-2 gap-2">
+                                                <button onclick="window.open('\${clashUrl}', '_blank')" class="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                                                     下载配置
                                                 </button>
-                                                <button onclick="window.open('\${clashDisplayUrl}', '_blank')" class="w-1/2 p-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                                <button onclick="window.open('\${clashDisplayUrl}', '_blank')" class="p-2 bg-green-600 text-white rounded hover:bg-green-700">
                                                     浏览器查看
                                                 </button>
                                             </div>
@@ -434,6 +459,10 @@ export function generateHtml() {
                                 alert("节点保存错误: " + error.message);
                             }
                         } else if (singleRadio && singleRadio.checked) {
+                            // 检查是否为完整Clash配置
+                            const subscriptionType = await checkSubscriptionType(nodeInput.value);
+                            
+                            // 生成通用订阅链接
                             const baseUrl = window.location.origin + '/base?url=' + encodeURIComponent(nodeInput.value);
                             const baseBlock = \`
                                 <div class="link-block bg-gray-800 p-4 rounded-lg">
@@ -488,6 +517,30 @@ export function generateHtml() {
                             // 生成 Clash 订阅链接
                             const clashUrl = window.location.origin + '/clash?url=' + encodeURIComponent(nodeInput.value) + templateParam;
                             const clashDisplayUrl = clashUrl + '&display=true';
+                            
+                            // 添加保留原始配置选项（如果检测到是完整Clash配置）
+                            let clashOriginalUrl = '';
+                            let originalConfigSection = '';
+                            
+                            if (subscriptionType.isCompleteClash) {
+                                clashOriginalUrl = clashUrl + '&useOriginal=true';
+                                const clashOriginalDisplayUrl = clashOriginalUrl + '&display=true';
+                                
+                                originalConfigSection = \`
+                                    <div class="mt-2 p-2 bg-yellow-100 rounded text-sm">
+                                        <p>检测到完整Clash配置，是否保留原始规则？</p>
+                                        <div class="grid grid-cols-2 gap-2 mt-2">
+                                            <button onclick="window.open('\${clashUrl}', '_blank')" class="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
+                                                应用模板规则
+                                            </button>
+                                            <button onclick="window.open('\${clashOriginalUrl}', '_blank')" class="p-2 bg-green-600 text-white rounded hover:bg-green-700">
+                                                保留原始规则
+                                            </button>
+                                        </div>
+                                    </div>
+                                \`;
+                            }
+                            
                             const clashBlock = \`
                                 <div class="link-block bg-gray-800 p-4 rounded-lg">
                                     <div class="flex justify-between items-center mb-2">
@@ -503,7 +556,7 @@ export function generateHtml() {
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
                                                 </svg>
                                             </button>
-                                            <button onclick="copyToClipboard('\${clashDisplayUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制显示链接">
+                                            <button onclick="copyToClipboard('\${clashDisplayUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制查看链接">
                                                 <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
@@ -514,14 +567,15 @@ export function generateHtml() {
                                     <div class="link-url bg-gray-900 p-3 rounded text-white font-mono break-all">
                                         \${clashUrl}
                                     </div>
-                                    <div class="mt-2 flex space-x-2">
-                                        <button onclick="window.open('\${clashUrl}', '_blank')" class="w-1/2 p-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                                    <div class="mt-2 grid grid-cols-2 gap-2">
+                                        <button onclick="window.open('\${clashUrl}', '_blank')" class="p-2 bg-blue-600 text-white rounded hover:bg-blue-700">
                                             下载配置
                                         </button>
-                                        <button onclick="window.open('\${clashDisplayUrl}', '_blank')" class="w-1/2 p-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                        <button onclick="window.open('\${clashDisplayUrl}', '_blank')" class="p-2 bg-green-600 text-white rounded hover:bg-green-700">
                                             浏览器查看
                                         </button>
                                     </div>
+                                    \${originalConfigSection}
                                 </div>
                             \`;
                             container.insertAdjacentHTML('beforeend', clashBlock);
