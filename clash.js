@@ -49,10 +49,11 @@ export async function handleClashRequest(request, env) {
         const url = new URL(request.url);
         const directUrl = url.searchParams.get('url');
         const templateUrl = url.searchParams.get('template') || getTemplateUrl(env);
-        // 新增参数：display=true 表示直接显示，不自动下载
+        // 添加显示模式参数
         const displayMode = url.searchParams.get('display') === 'true';
         
         console.log('Fetching template from:', templateUrl);
+        console.log('Display mode:', displayMode);
         
         // 检查必需的URL参数
         let nodes = [];
@@ -93,21 +94,21 @@ export async function handleClashRequest(request, env) {
 
         // 生成完整的 Clash 配置
         const config = await generateClashConfig(templateContent, nodes);
-
+        
         // 根据显示模式返回不同的响应
         if (displayMode) {
-            // 确保使用UTF-8编码
+            // 浏览器查看模式，设置正确的字符编码
             return new Response(config, {
                 headers: {
-                    'Content-Type': 'text/plain; charset=utf-8', // 明确指定UTF-8编码
-                    'Access-Control-Allow-Origin': '*' // 允许跨域访问
+                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Access-Control-Allow-Origin': '*'
                 }
             });
         } else {
             // 下载模式
             return new Response(config, {
                 headers: {
-                    'Content-Type': 'text/yaml; charset=utf-8', // 同样指定UTF-8编码
+                    'Content-Type': 'text/yaml; charset=utf-8',
                     'Content-Disposition': 'attachment; filename=config.yaml',
                     'Access-Control-Allow-Origin': '*'
                 }
@@ -122,6 +123,8 @@ export async function handleClashRequest(request, env) {
 async function generateClashConfig(templateContent, nodes) {
     let config = BASE_CONFIG + '\n';
     
+    console.log(`Processing ${nodes.length} nodes`);
+    
     // 添加代理节点
     config += 'proxies:\n';
     
@@ -129,6 +132,12 @@ async function generateClashConfig(templateContent, nodes) {
         const converted = convertNodeToClash(node);
         return converted;
     }).filter(Boolean);
+    
+    // 调试信息：检查转换后的节点
+    console.log(`Converted ${proxies.length} proxies`);
+    if (proxies.length > 0) {
+        console.log('First proxy example:', JSON.stringify(proxies[0]).substring(0, 100) + '...');
+    }
     
     proxies.forEach(proxy => {
         config += '  -';
@@ -289,7 +298,7 @@ async function generateClashConfig(templateContent, nodes) {
             if (ruleContent.startsWith('GEOIP,')) {
                 const [, geoipValue] = ruleContent.split(',');
                 if (geoipValue) {
-                    config += `  - GEOIP,${geoipValue},${group}\n`;
+                    config += `  - ${ruleContent},${group}\n`;
                 }
             } else if (ruleContent === 'MATCH' || ruleContent === 'FINAL') {
                 config += `  - MATCH,${group}\n`;
