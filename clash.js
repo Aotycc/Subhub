@@ -66,22 +66,22 @@ export async function handleClashRequest(request, env) {
         
         // 检查必需的URL参数
         let nodes = [];
-        let content = '';
+        let originalContent = '';
         
         if (directUrl) {
             // 获取原始订阅内容
             const response = await fetch(directUrl);
             if (!response.ok) {
-                return new Response(`Failed to fetch URL: ${response.status} ${response.statusText}`, { status: 400 });
+                return new Response(`Failed to fetch from ${directUrl}: ${response.status}`, { status: 400 });
             }
             
-            content = await response.text();
+            originalContent = await response.text();
             
             // 检测是否为完整的Clash配置
-            if (isCompleteClashConfig(content) && (useOriginal || url.searchParams.has('useOriginal'))) {
-                // 直接返回原始配置
+            if (isCompleteClashConfig(originalContent) && useOriginal) {
+                // 直接返回原始配置，设置适当的headers
                 const headers = displayMode ? 
-                    {
+                    { 
                         'Content-Type': 'text/plain; charset=utf-8',
                         'Access-Control-Allow-Origin': '*'
                     } : 
@@ -90,10 +90,10 @@ export async function handleClashRequest(request, env) {
                         'Content-Disposition': 'attachment; filename=config.yaml'
                     };
                 
-                return new Response(content, { headers });
+                return new Response(originalContent, { headers });
             }
             
-            // 如果不是完整的Clash配置或用户没有选择保留原始配置，则进行正常的解析
+            // 继续原有的解析流程
             nodes = await Parser.parse(directUrl, env);
         } else {
             return new Response('Missing required parameters', { status: 400 });
@@ -131,7 +131,7 @@ export async function handleClashRequest(request, env) {
         // 生成完整的 Clash 配置
         const config = await generateClashConfig(templateContent, nodes);
 
-        // 根据显示模式返回不同的响应
+        // 根据displayMode返回不同的响应
         if (displayMode) {
             return new Response(config, {
                 headers: {
