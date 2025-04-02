@@ -133,7 +133,7 @@ class TemplateManager {
 new TemplateManager();
 `;
 
-// ���改 generateHtml 函数
+// 修改 generateHtml 函数
 export function generateHtml() {
     return `<!DOCTYPE html>
 <html lang="zh">
@@ -388,6 +388,7 @@ export function generateHtml() {
                                     
                                     // 生成 Clash 订阅链接
                                     const clashUrl = window.location.origin + '/clash?url=' + encodeURIComponent('http://inner.nodes.secret/id-' + id) + templateParam;
+                                    const clashDisplayUrl = clashUrl + '&display=true';
                                     const clashBlock = \`
                                         <div class="link-block bg-gray-800 p-4 rounded-lg">
                                             <div class="flex justify-between items-center mb-2">
@@ -398,15 +399,29 @@ export function generateHtml() {
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v-4m6 0h-2m2 0v4m-6 0h-2m2 0v4m-6-4h2m-2 0v4m0-11v-4m0 0h2m-2 0h10a2 2 0 002-2V4a2 2 0 00-2-2H4a2 2 0 00-2 2v2a2 2 0 002 2z"/>
                                                         </svg>
                                                     </button>
-                                                    <button onclick="copyToClipboard('\${clashUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制链接">
+                                                    <button onclick="copyToClipboard('\${clashUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制下载链接">
                                                         <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                                        </svg>
+                                                    </button>
+                                                    <button onclick="copyToClipboard('\${clashDisplayUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制显示链接">
+                                                        <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                         </svg>
                                                     </button>
                                                 </div>
                                             </div>
                                             <div class="link-url bg-gray-900 p-3 rounded text-white font-mono break-all">
                                                 \${clashUrl}
+                                            </div>
+                                            <div class="mt-2 flex space-x-2">
+                                                <button onclick="window.open('\${clashUrl}', '_blank')" class="w-1/2 p-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                                                    下载配置
+                                                </button>
+                                                <button onclick="window.open('\${clashDisplayUrl}', '_blank')" class="w-1/2 p-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                                    浏览器查看
+                                                </button>
                                             </div>
                                         </div>
                                     \`;
@@ -472,6 +487,7 @@ export function generateHtml() {
                             
                             // 生成 Clash 订阅链接
                             const clashUrl = window.location.origin + '/clash?url=' + encodeURIComponent(nodeInput.value) + templateParam;
+                            const clashDisplayUrl = clashUrl + '&display=true';
                             const clashBlock = \`
                                 <div class="link-block bg-gray-800 p-4 rounded-lg">
                                     <div class="flex justify-between items-center mb-2">
@@ -482,15 +498,29 @@ export function generateHtml() {
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v-4m6 0h-2m2 0v4m-6 0h-2m2 0v4m-6-4h2m-2 0v4m0-11v-4m0 0h2m-2 0h10a2 2 0 002-2V4a2 2 0 00-2-2H4a2 2 0 00-2 2v2a2 2 0 002 2z"/>
                                                 </svg>
                                             </button>
-                                            <button onclick="copyToClipboard('\${clashUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制链接">
+                                            <button onclick="copyToClipboard('\${clashUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制下载链接">
                                                 <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/>
+                                                </svg>
+                                            </button>
+                                            <button onclick="copyToClipboard('\${clashDisplayUrl}')" class="p-2 hover:bg-gray-700 rounded transition-colors" title="复制显示链接">
+                                                <svg class="w-5 h-5 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/>
                                                 </svg>
                                             </button>
                                         </div>
                                     </div>
                                     <div class="link-url bg-gray-900 p-3 rounded text-white font-mono break-all">
                                         \${clashUrl}
+                                    </div>
+                                    <div class="mt-2 flex space-x-2">
+                                        <button onclick="window.open('\${clashUrl}', '_blank')" class="w-1/2 p-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
+                                            下载配置
+                                        </button>
+                                        <button onclick="window.open('\${clashDisplayUrl}', '_blank')" class="w-1/2 p-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
+                                            浏览器查看
+                                        </button>
                                     </div>
                                 </div>
                             \`;
