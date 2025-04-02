@@ -44,21 +44,47 @@ const getTemplateUrl = (env) => {
     return env?.DEFAULT_TEMPLATE_URL || 'https://raw.githubusercontent.com/Troywww/singbox_conf/refs/heads/main/singbox_clash_conf.txt';
 };
 
+// 检查内容是否为Clash配置格式
+function isClashYaml(content) {
+    return content.includes('proxies:') && 
+           (content.includes('rules:') || 
+            content.includes('rule-providers:'));
+}
+
 export async function handleClashRequest(request, env) {
     try {
         const url = new URL(request.url);
         const directUrl = url.searchParams.get('url');
         const templateUrl = url.searchParams.get('template') || getTemplateUrl(env);
-        // 添加显示模式参数
+        // 新增参数：display=true 表示直接显示，不自动下载
         const displayMode = url.searchParams.get('display') === 'true';
         
         console.log('Fetching template from:', templateUrl);
-        console.log('Display mode:', displayMode);
         
         // 检查必需的URL参数
         let nodes = [];
+        let content = '';
+        let isClashFormat = false;
+        
         if (directUrl) {
-            nodes = await Parser.parse(directUrl, env);
+            // 获取内容
+            const response = await fetch(directUrl);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch from URL: ${response.status}`);
+            }
+            
+            content = await response.text();
+            
+            // 检查是否为Clash格式
+            isClashFormat = isClashYaml(content);
+            
+            if (isClashFormat) {
+                // 如果是Clash格式，直接处理
+                return handleExistingClashConfig(content, templateUrl, env, displayMode);
+            } else {
+                // 否则按正常流程处理
+                nodes = await Parser.parse(directUrl, env);
+            }
         } else {
             return new Response('Missing required parameters', { status: 400 });
         }
@@ -94,23 +120,20 @@ export async function handleClashRequest(request, env) {
 
         // 生成完整的 Clash 配置
         const config = await generateClashConfig(templateContent, nodes);
-        
-        // 根据显示模式返回不同的响应
+
+        // 根据显示模式返回不同响应
         if (displayMode) {
-            // 浏览器查看模式，设置正确的字符编码
             return new Response(config, {
                 headers: {
-                    'Content-Type': 'text/plain; charset=utf-8',
+                    'Content-Type': 'text/plain', // 纯文本显示
                     'Access-Control-Allow-Origin': '*'
                 }
             });
         } else {
-            // 下载模式
             return new Response(config, {
                 headers: {
-                    'Content-Type': 'text/yaml; charset=utf-8',
-                    'Content-Disposition': 'attachment; filename=config.yaml',
-                    'Access-Control-Allow-Origin': '*'
+                    'Content-Type': 'text/yaml',
+                    'Content-Disposition': 'attachment; filename=config.yaml'
                 }
             });
         }
@@ -120,10 +143,214 @@ export async function handleClashRequest(request, env) {
     }
 }
 
+// 处理已有的Clash配置
+async function handleExistingClashConfig(content, templateUrl, env, displayMode) {
+    try {
+        // 获取模板内容
+        let templateContent;
+        
+        if (templateUrl.startsWith('https://inner.template.secret/id-')) {
+            const templateId = templateUrl.replace('https://inner.template.secret/id-', '');
+            const templateData = await env.TEMPLATE_CONFIG.get(templateId);
+            if (!templateData) {
+                return new Response('Template not found', { status: 404 });
+            }
+            const templateInfo = JSON.parse(templateData);
+            templateContent = templateInfo.content;
+        } else {
+            const templateResponse = await fetch(templateUrl);
+            if (!templateResponse.ok) {
+                return new Response('Failed to fetch template', { status: 500 });
+            }
+            templateContent = await templateResponse.text();
+        }
+        
+        // 从原始内容提取代理节点部分
+        const proxySection = extractProxySection(content);
+        
+        // 生成规则配置
+        const ruleLines = templateContent.split('\n')
+            .filter(line => line.startsWith('ruleset='));
+        
+        // 使用Base配置作为起点
+        let configYaml = BASE_CONFIG;
+        
+        // 添加代理配置
+        configYaml += proxySection;
+        
+        // 添加模板中的规则部分（复用现有逻辑）
+        configYaml += '\nproxy-groups:\n';
+        const groupLines = templateContent.split('\n')
+            .filter(line => line.startsWith('custom_proxy_group='));
+        
+        // 处理分组（和generateClashConfig中相同）
+        groupLines.forEach(line => {
+            const [groupName, ...rest] = line.slice('custom_proxy_group='.length).split('`');
+            const groupType = rest[0];
+            const options = rest.slice(1);
+            
+            configYaml += `  - name: "${groupName}"\n`;
+            configYaml += `    type: ${groupType === 'url-test' ? 'url-test' : 'select'}\n`;
+            
+            // 处理 url-test 类型的特殊配置
+            if (groupType === 'url-test') {
+                const testUrl = options.find(opt => opt.startsWith('http')) || 'http://www.gstatic.com/generate_204';
+                const interval = 300;
+                const tolerance = groupName.includes('欧美') ? 150 : 50;
+                
+                configYaml += `    url: ${testUrl}\n`;
+                configYaml += `    interval: ${interval}\n`;
+                configYaml += `    tolerance: ${tolerance}\n`;
+            }
+            
+            configYaml += '    proxies:\n';
+            let hasProxies = false;
+            
+            // 处理分组选项（简化处理，仅添加DIRECT和REJECT）
+            options.forEach(option => {
+                if (option === 'DIRECT' || option === 'REJECT') {
+                    hasProxies = true;
+                    configYaml += `      - ${option}\n`;
+                }
+            });
+
+            // 如果分组没有任何节点，添加 DIRECT
+            if (!hasProxies) {
+                configYaml += '      - "DIRECT"\n';
+            }
+        });
+        
+        // 处理规则
+        configYaml += '\nrules:\n';
+        
+        // 获取并解析所有规则列表
+        for (const line of ruleLines) {
+            // 确保规则行格式正确
+            if (!line.includes(',')) {
+                continue;
+            }
+
+            const groupEndIndex = line.indexOf(',');
+            const group = line.substring('ruleset='.length, groupEndIndex);
+            const url = line.substring(groupEndIndex + 1);
+            
+            // 确保 group 存在
+            if (!group) {
+                continue;
+            }
+
+            const outbound = group === 'DIRECT' ? 'direct' :
+                            group === 'REJECT' ? 'block' :
+                            group;
+
+            if (url.startsWith('[]')) {
+                const ruleContent = url.slice(2);
+                if (!ruleContent) {
+                    continue;
+                }
+
+                if (ruleContent.startsWith('GEOIP,')) {
+                    const [, geoipValue] = ruleContent.split(',');
+                    if (geoipValue) {
+                        configYaml += `  - GEOIP,${geoipValue},${group}\n`;
+                    }
+                } else if (ruleContent === 'MATCH' || ruleContent === 'FINAL') {
+                    configYaml += `  - MATCH,${group}\n`;
+                }
+            } else {
+                try {
+                    // 获取规则列表内容
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        console.error(`Failed to fetch rules from ${url}: ${response.status}`);
+                        continue;
+                    }
+                    
+                    const ruleContent = await response.text();
+                    const rules = ruleContent.split('\n')
+                        .map(rule => rule.trim())
+                        .filter(rule => rule && !rule.startsWith('#'));
+                    
+                    // 添加解析后的规则
+                    rules.forEach(rule => {
+                        if (rule.includes(',')) {
+                            const parts = rule.split(',');
+                            const ruleType = parts[0];
+                            const ruleValue = parts[1];
+                            
+                            // 跳过 USER-AGENT 和 URL-REGEX 规则
+                            if (ruleType === 'USER-AGENT' || ruleType === 'URL-REGEX') {
+                                return;
+                            }
+                            
+                            // 处理规则
+                            if (ruleType === 'IP-CIDR' || ruleType === 'IP-CIDR6') {
+                                configYaml += `  - ${ruleType},${ruleValue},${group},no-resolve\n`;
+                            } else if (ruleType === 'FINAL') {
+                                configYaml += `  - MATCH,${group}\n`;
+                            } else {
+                                configYaml += `  - ${ruleType},${ruleValue},${group}\n`;
+                            }
+                        }
+                    });
+                } catch (error) {
+                    console.error(`Error processing rule list ${url}:`, error);
+                }
+            }
+        }
+        
+        // 根据显示模式返回不同响应
+        if (displayMode) {
+            return new Response(configYaml, {
+                headers: {
+                    'Content-Type': 'text/plain', // 纯文本显示
+                    'Access-Control-Allow-Origin': '*'
+                }
+            });
+        } else {
+            return new Response(configYaml, {
+                headers: {
+                    'Content-Type': 'text/yaml',
+                    'Content-Disposition': 'attachment; filename=config.yaml'
+                }
+            });
+        }
+    } catch (error) {
+        console.error('Error processing Clash config:', error);
+        return new Response('Error processing Clash config: ' + error.message, { status: 500 });
+    }
+}
+
+// 从Clash格式内容中提取代理节点部分
+function extractProxySection(content) {
+    let proxySection = '';
+    let inProxySection = false;
+    let inProxyGroupSection = false;
+    
+    const lines = content.split('\n');
+    
+    proxySection += 'proxies:\n';
+    
+    // 查找并提取proxies部分
+    for (const line of lines) {
+        if (line.trim() === 'proxies:') {
+            inProxySection = true;
+            continue;
+        } else if (inProxySection && (line.trim() === 'proxy-groups:' || line.trim() === 'rules:')) {
+            inProxySection = false;
+            break;
+        }
+        
+        if (inProxySection) {
+            proxySection += line + '\n';
+        }
+    }
+    
+    return proxySection;
+}
+
 async function generateClashConfig(templateContent, nodes) {
     let config = BASE_CONFIG + '\n';
-    
-    console.log(`Processing ${nodes.length} nodes`);
     
     // 添加代理节点
     config += 'proxies:\n';
@@ -132,12 +359,6 @@ async function generateClashConfig(templateContent, nodes) {
         const converted = convertNodeToClash(node);
         return converted;
     }).filter(Boolean);
-    
-    // 调试信息：检查转换后的节点
-    console.log(`Converted ${proxies.length} proxies`);
-    if (proxies.length > 0) {
-        console.log('First proxy example:', JSON.stringify(proxies[0]).substring(0, 100) + '...');
-    }
     
     proxies.forEach(proxy => {
         config += '  -';
@@ -271,11 +492,6 @@ async function generateClashConfig(templateContent, nodes) {
     
     // 获取并解析所有规则列表
     for (const line of ruleLines) {
-        // 确保规则行格式正确
-        if (!line.includes(',')) {
-            continue;
-        }
-
         const groupEndIndex = line.indexOf(',');
         const group = line.substring('ruleset='.length, groupEndIndex);
         const url = line.substring(groupEndIndex + 1);
@@ -530,7 +746,6 @@ function convertHysteria2(node) {
         obfs: node.settings.obfs,
         'obfs-password': node.settings.obfsParam
     };
-
 }
 
 // 添加新的转换函数
