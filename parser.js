@@ -105,10 +105,7 @@ export default class Parser {
      */
     static isClashYaml(content) {
         // 检查是否包含Clash配置的关键字段
-        return content.includes('proxies:') && 
-               (content.includes('rules:') || 
-                content.includes('rule-providers:') ||
-                content.includes('proxy-groups:'));
+        return content.includes('proxies:') ;
     }
 
     /**
