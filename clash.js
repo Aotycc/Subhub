@@ -257,6 +257,38 @@ async function handleExistingClashConfig(content, templateUrl, env, displayMode)
                 } else if (ruleContent === 'MATCH' || ruleContent === 'FINAL') {
                     configYaml += `  - MATCH,${group}\n`;
                 }
+            } else if (url.endsWith('.mrs')) {
+                // 处理mrs格式规则
+                try {
+                    // 获取规则列表内容
+                    const response = await fetch(url);
+                    if (!response.ok) {
+                        console.error(`Failed to fetch mrs rules from ${url}: ${response.status}`);
+                        continue;
+                    }
+                    
+                    // 对于mrs规则，我们直接加入对应的引用，不需要解析内容
+                    // 例如geosite/cn.mrs规则转换为GEOSITE,cn规则
+                    const urlParts = url.split('/');
+                    const filename = urlParts[urlParts.length - 1];
+                    const rulesetName = filename.replace('.mrs', '');
+                    
+                    // 检查是否为geosite或geoip规则
+                    if (url.includes('/geosite/')) {
+                        configYaml += `  - GEOSITE,${rulesetName},${group}\n`;
+                    } else if (url.includes('/geoip/')) {
+                        configYaml += `  - GEOIP,${rulesetName},${group}\n`;
+                    } else if (filename.startsWith('category-')) {
+                        // 处理category类型的规则，如category-ai-!cn.mrs
+                        const category = rulesetName.replace('category-', '');
+                        configYaml += `  - GEOSITE,${category},${group}\n`;
+                    } else {
+                        // 其他类型mrs规则，尝试直接使用文件名作为规则名
+                        configYaml += `  - RULE-SET,${rulesetName},${group}\n`;
+                    }
+                } catch (error) {
+                    console.error(`Error processing mrs rule list ${url}:`, error);
+                }
             } else {
                 try {
                     // 获取规则列表内容
@@ -520,6 +552,38 @@ async function generateClashConfig(templateContent, nodes) {
                 config += `  - MATCH,${group}\n`;
             } else {
                 config += `  - ${ruleContent},${group}\n`;
+            }
+        } else if (url.endsWith('.mrs')) {
+            // 处理mrs格式规则
+            try {
+                // 获取规则列表内容
+                const response = await fetch(url);
+                if (!response.ok) {
+                    console.error(`Failed to fetch mrs rules from ${url}: ${response.status}`);
+                    continue;
+                }
+                
+                // 对于mrs规则，我们直接加入对应的引用，不需要解析内容
+                // 例如geosite/cn.mrs规则转换为GEOSITE,cn规则
+                const urlParts = url.split('/');
+                const filename = urlParts[urlParts.length - 1];
+                const rulesetName = filename.replace('.mrs', '');
+                
+                // 检查是否为geosite或geoip规则
+                if (url.includes('/geosite/')) {
+                    config += `  - GEOSITE,${rulesetName},${group}\n`;
+                } else if (url.includes('/geoip/')) {
+                    config += `  - GEOIP,${rulesetName},${group}\n`;
+                } else if (filename.startsWith('category-')) {
+                    // 处理category类型的规则，如category-ai-!cn.mrs
+                    const category = rulesetName.replace('category-', '');
+                    config += `  - GEOSITE,${category},${group}\n`;
+                } else {
+                    // 其他类型mrs规则，尝试直接使用文件名作为规则名
+                    config += `  - RULE-SET,${rulesetName},${group}\n`;
+                }
+            } catch (error) {
+                console.error(`Error processing mrs rule list ${url}:`, error);
             }
         } else {
             try {
