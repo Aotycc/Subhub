@@ -54,15 +54,6 @@ export function parseRules(rulesStr) {
           displayName: ruleName // 使用 [] 后面的部分作为显示名称
         };
       }
-      // 检查是否为mrs格式规则
-      if (url.endsWith('.mrs')) {
-        return {
-          name,
-          url,
-          displayName: url.split('/').pop(), // 使用 URL 的最后一部分作为显示名称
-          isMrs: true  // 标记为mrs格式
-        };
-      }
       // 普通 URL 规则
       return {
         name,
